@@ -1,0 +1,118 @@
+---
+title: "Practical Machine Learning"
+author: "Rajeev"
+date: "4/11/2018"
+output: html_document
+---
+
+## Practical Machine Learning Course Project
+
+##Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement ??? a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+##About Data
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+Human Activity Recognition - HAR - has emerged as a key research area in the last years and is gaining increasing attention by the pervasive computing research community (see picture below, that illustrates the increasing number of publications in HAR with wearable accelerometers), especially for the development of context-aware systems. There are many potential applications for HAR, like: elderly monitoring, life log systems for monitoring energy expenditure and for supporting weight-loss programs, and digital assistants for weight lifting exercises.
+
+
+##Data gethering and cleaning.
+
+```{r setup, include=FALSE}
+library(tidyr) 
+library(readr)
+library(dplyr)
+library(lubridate)
+library(data.table)
+library(ggplot2)
+library(caret)
+library(e1071)
+library(gbm)
+library(randomForest)
+```
+
+### Reading Data
+
+```{r, echo=TRUE}
+url1<- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+url2<- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+download.file(url1, destfile= "traindat", method= "curl")
+download.file(url2, destfile= "testdat", method="curl")
+read.csv("traindat",na.strings=c("NA","#DIV/0!",""))-> traindata
+read.csv("testdat", na.strings=c("NA","#DIV/0!",""))-> testdata
+str(traindata)
+head(traindata,6)
+```
+
+### Cleaing Data
+This raw data set had 19622 obsevations and 160 variables but most os the varibales were either "NA" or negative. Hence, eliminating our noise data is required.
+
+```{r, echo=TRUE}
+#Setting thresh hold for NA or no value and cleaning data
+colth<-ncol(traindata)*.95
+noNa <- !apply(traindata, 2, function(x) sum(is.na(x)) > colth  || sum(x=="") > colth)
+traindata1 <- traindata[, noNa]
+
+#Cleaning near Zero data.
+traindata1 <- traindata1[, colSums(is.na(traindata1)) == 0] 
+testdata1 <- testdata[, colSums(is.na(testdata)) == 0] 
+
+#Removing unwanted coloumns
+
+traindata1 <- traindata1[, -(1:7)] 
+testdata1 <- testdata1[, -(1:7)] 
+
+```
+After cleaning data number of variable had reduced to 52 and observations count is retained.
+
+##Data Processing and modeling.
+Now that the data is cleaned to a great extend this has to be further processed and put under certain model.
+
+###Understanding test data.
+```{r, echo=FALSE}
+#Ploting Test Data
+plot(traindata1$classe, xlab= "Classe", ylab="Frequency", main="Trianind Data Overview")
+
+```
+
+###Further Partitioning the Data.
+The training dat set is further partitioned for cross validation.
+```{r, echo=TRUE}
+ partdata<- createDataPartition(y=traindata1$classe, p=.8, list = FALSE)
+traindata2<- traindata1[partdata,]
+testdata2<- traindata1[-partdata,]
+```
+Based on the graph above, we can see that each level frequency is within the same order of magnitude of each other. Level A is the most frequent while level D is the least frequent.
+
+
+###Data Modeling.
+
+Since We have multiple modeling options we will try 2 option to and test the accurac.
+
+####Modeling 1- Random Forest Model
+```{r, echo=TRUE}
+model1 <- randomForest(classe ~. , data=traindata2, method="class")
+predict1 <- predict(model1, testdata2, type = "class")
+confusionMatrix(predict1, testdata2$classe)
+
+```
+
+####Modeling 2- LDA Method using train function.
+```{r, echo= TRUE}
+model2<- train(classe~., data = traindata2, method="lda")
+predict2 <- predict(model2, testdata2)
+confusionMatrix(predict2,testdata2$classe )
+
+```
+Considered the result of model 1 & 2,  it is quote evident that "Model1" produce the more accurcy in prediction compared to "Model 2". Hence runing the prediction model in the test data set.
+
+###Final Result
+
+Appling model1 on the testing data. Hence final result arrived using model#1 which is RandomForest.
+
+```{r, echo = TRUE}
+predict3 <- predict(model1, testdata1, type = "class")
+predict3
+
+```
+
